@@ -1,3 +1,6 @@
 pandas
 python-dotenv
 gigachain
+langchain_gigachat
+langchain
+openai
