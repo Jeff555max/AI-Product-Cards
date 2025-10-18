@@ -62,6 +62,16 @@ def get_product_info(query, df):
     """
     import re
     
+    # Словарь синонимов для перевода и расширения поиска
+    synonyms = {
+        'ноутбук': ['laptop', 'notebook', 'ноутбук'],
+        'наушники': ['headphone', 'earphone', 'earbud', 'наушники'],
+        'колонка': ['speaker', 'колонка'],
+        'телефон': ['phone', 'smartphone', 'телефон'],
+        'камера': ['camera', 'камера'],
+        'планшет': ['tablet', 'ipad', 'планшет'],
+    }
+    
     # Проверяем, есть ли колонка 'name' (может называться по-другому)
     name_col = None
     possible_names = ['name', 'title', 'product', 'description', 'название', 'наименование']
@@ -92,21 +102,33 @@ def get_product_info(query, df):
     if not row.empty:
         return row.iloc[0].to_dict()
     
-    # Поиск по ключевым словам
+    # Собираем все ключевые слова для поиска (оригинальные + синонимы)
+    search_keywords = []
     keywords = query.lower().split()
+    
     for keyword in keywords:
+        search_keywords.append(keyword)
+        # Добавляем синонимы, если есть
+        if keyword in synonyms:
+            search_keywords.extend(synonyms[keyword])
+    
+    # Поиск по ключевым словам
+    for keyword in search_keywords:
         if len(keyword) > 2:  # Игнорируем короткие слова
             # Экранируем специальные символы regex
             escaped_keyword = re.escape(keyword)
             try:
                 matches = df[df[name_col].astype(str).str.lower().str.contains(escaped_keyword, na=False, regex=True)]
                 if not matches.empty:
-                    print(f"✓ Найдено {len(matches)} товаров по запросу '{keyword}'. Беру первый.")
+                    print(f"✓ Найдено {len(matches)} товаров по запросу '{keyword}'.")
+                    print(f"📦 Первый товар: {matches.iloc[0][name_col]}")
                     return matches.iloc[0].to_dict()
             except Exception as e:
                 print(f"⚠️ Ошибка поиска по слову '{keyword}': {e}")
                 continue
     
+    print(f"❌ Товар не найден по запросу: {query}")
+    print(f"💡 Попробуйте: laptop, speaker, camera, headphone и т.д.")
     return None
 
 def main():
