@@ -7,20 +7,28 @@ from langchain.chains import LLMChain
 from langchain_gigachat.chat_models import GigaChat
 import requests
 
-# Загрузка переменных окружения
+# Загрузка переменных окружения из .env файла
 load_dotenv()
 
+# Получение настроек GigaChat из переменных окружения
 GIGACHAT_API_KEY = os.getenv("GIGACHAT_API_KEY")
 GIGACHAT_CLIENT_ID = os.getenv("GIGACHAT_CLIENT_ID")
 GIGACHAT_SCOPE = os.getenv("GIGACHAT_SCOPE")
-GIGACHAT_MODEL = os.getenv("GIGACHAT_MODEL", "GigaChat-Pro")
-GIGACHAT_TEMPERATURE = float(os.getenv("GIGACHAT_TEMPERATURE", 0.2))
-GIGACHAT_TOP_P = float(os.getenv("GIGACHAT_TOP_P", 1))
+GIGACHAT_MODEL = os.getenv("GIGACHAT_MODEL", "GigaChat-Pro")  # По умолчанию GigaChat-Pro
+GIGACHAT_TEMPERATURE = float(os.getenv("GIGACHAT_TEMPERATURE", 0.2))  # Температура для контроля креативности
+GIGACHAT_TOP_P = float(os.getenv("GIGACHAT_TOP_P", 1))  # Top-p sampling для разнообразия ответов
 
 
 def download_yadisk_file(yadisk_url, out_path):
     """
-    Скачивает файл с Яндекс.Диска по публичной ссылке через сервис https://cloud-api.yandex.net/v1/disk/public/resources/download
+    Скачивает файл с Яндекс.Диска по публичной ссылке.
+    
+    Использует API Яндекс.Диска для получения прямой ссылки на скачивание,
+    затем загружает файл по частям (chunks) для экономии памяти.
+    
+    Args:
+        yadisk_url (str): Публичная ссылка на файл на Яндекс.Диске
+        out_path (str): Путь для сохранения скачанного файла
     """
     api_url = 'https://cloud-api.yandex.net/v1/disk/public/resources/download'
     params = {'public_key': yadisk_url}
@@ -34,6 +42,16 @@ def download_yadisk_file(yadisk_url, out_path):
                 out_file.write(chunk)
 
 def load_products():
+    """
+    Загружает каталог товаров из локального файла или с Яндекс.Диска.
+    
+    Пользователь выбирает способ загрузки:
+    1 - из локального файла data/products.csv
+    2 - скачать с Яндекс.Диска
+    
+    Returns:
+        pandas.DataFrame: Загруженный каталог товаров
+    """
     data_dir = os.path.join(os.path.dirname(__file__), '..', 'data')
     os.makedirs(data_dir, exist_ok=True)
     local_path = os.path.join(data_dir, 'products.csv')
@@ -58,11 +76,24 @@ def load_products():
 
 def get_product_info(query, df):
     """
-    Улучшенный поиск товара: сначала точное совпадение, затем поиск по ключевым словам
+    Умный поиск товара в каталоге с поддержкой синонимов и нечёткого поиска.
+    
+    Алгоритм поиска:
+    1. Сначала пытается найти точное совпадение по названию
+    2. Если не найдено - ищет по ключевым словам с использованием словаря синонимов
+    3. Поддерживает русско-английский перевод (ноутбук -> laptop, наушники -> headphone)
+    
+    Args:
+        query (str): Поисковый запрос пользователя
+        df (pandas.DataFrame): Каталог товаров для поиска
+        
+    Returns:
+        dict or None: Словарь с информацией о товаре или None, если товар не найден
     """
     import re
     
-    # Словарь синонимов для перевода и расширения поиска
+    # Словарь синонимов для перевода русских запросов на английский
+    # и расширения поиска близкими по смыслу терминами
     synonyms = {
         'ноутбук': ['laptop', 'notebook', 'ноутбук'],
         'наушники': ['headphone', 'earphone', 'earbud', 'наушники'],
@@ -72,7 +103,8 @@ def get_product_info(query, df):
         'планшет': ['tablet', 'ipad', 'планшет'],
     }
     
-    # Проверяем, есть ли колонка 'name' (может называться по-другому)
+    # Автоопределение колонки с названием товара
+    # Проверяем типичные варианты названий колонок
     name_col = None
     possible_names = ['name', 'title', 'product', 'description', 'название', 'наименование']
     
@@ -85,37 +117,39 @@ def get_product_info(query, df):
         if name_col:
             break
     
+    # Если стандартная колонка не найдена, берём первую текстовую колонку (кроме ID)
     if not name_col:
-        # Если колонка не найдена, берём первую текстовую колонку
         for col in df.columns:
             if df[col].dtype == 'object' and col.lower() != 'id':
                 name_col = col
                 break
     
+    # В крайнем случае - просто первая колонка
     if not name_col:
         name_col = df.columns[0]
     
     print(f"🔍 Поиск в колонке: '{name_col}'")
     
-    # Попытка точного совпадения
+    # Шаг 1: Попытка точного совпадения (case-insensitive)
     row = df[df[name_col].astype(str).str.lower() == query.lower()]
     if not row.empty:
         return row.iloc[0].to_dict()
     
-    # Собираем все ключевые слова для поиска (оригинальные + синонимы)
+    # Шаг 2: Сборка списка ключевых слов для поиска
+    # Включаем оригинальные слова запроса + их синонимы
     search_keywords = []
     keywords = query.lower().split()
     
     for keyword in keywords:
         search_keywords.append(keyword)
-        # Добавляем синонимы, если есть
+        # Добавляем синонимы из словаря, если они есть
         if keyword in synonyms:
             search_keywords.extend(synonyms[keyword])
     
-    # Поиск по ключевым словам
+    # Шаг 3: Поиск по ключевым словам с использованием regex
     for keyword in search_keywords:
-        if len(keyword) > 2:  # Игнорируем короткие слова
-            # Экранируем специальные символы regex
+        if len(keyword) > 2:  # Игнорируем короткие слова (предлоги, артикли)
+            # Экранируем специальные символы regex для безопасности
             escaped_keyword = re.escape(keyword)
             try:
                 matches = df[df[name_col].astype(str).str.lower().str.contains(escaped_keyword, na=False, regex=True)]
@@ -127,11 +161,24 @@ def get_product_info(query, df):
                 print(f"⚠️ Ошибка поиска по слову '{keyword}': {e}")
                 continue
     
+    # Если ничего не найдено - подсказываем варианты запросов
     print(f"❌ Товар не найден по запросу: {query}")
     print(f"💡 Попробуйте: laptop, speaker, camera, headphone и т.д.")
     return None
 
 def main():
+    """
+    Главная функция для запуска интерактивного диалога с ассистентом.
+    
+    Основные возможности:
+    - Загрузка каталога товаров (локально или с Яндекс.Диска)
+    - Просмотр списка товаров по запросу ("покажи 10 товаров")
+    - Поиск товара и генерация карточки через GigaChat
+    - Отображение расхода токенов на каждый запрос
+    - Retry механизм при ошибках подключения (3 попытки с задержками 3, 6, 9 сек)
+    
+    Команды выхода: 'exit', 'выход', 'quit', 'q' или двойной Enter
+    """
     # Загрузка каталога товаров
     products_df = load_products()
     print("\nПервые 5 товаров из каталога:")
@@ -139,7 +186,7 @@ def main():
     print("\n=== Колонки в каталоге ===")
     print(products_df.columns.tolist())
     
-    # Определяем колонку с названием товара
+    # Определяем колонку с названием товара для корректного отображения
     name_columns = [col for col in products_df.columns if any(word in str(col).lower() for word in ['name', 'title', 'product', 'description', 'название'])]
     if name_columns:
         print(f"\n=== Найдены колонки с названиями: {name_columns} ===")
@@ -150,37 +197,40 @@ def main():
         print(f"Первая колонка: {products_df.columns[0]}")
         print(products_df[products_df.columns[0]].head())
 
-    # Загрузка системного промпта
+    # Загрузка системного промпта из файла
     with open(os.path.join(os.path.dirname(__file__), '..', 'prompts', 'system_prompt.txt'), encoding='utf-8') as f:
         prompt_template = f.read()
 
-
+    # Создание шаблона промпта с переменными для подстановки данных о товаре
     prompt = PromptTemplate(
         input_variables=["user_input", "product_data"],
         template=prompt_template
     )
 
+    # Инициализация GigaChat LLM с настройками из .env
     llm = GigaChat(
         credentials=GIGACHAT_API_KEY,
         model=GIGACHAT_MODEL,
         scope=GIGACHAT_SCOPE,
-        temperature=GIGACHAT_TEMPERATURE,
-        top_p=GIGACHAT_TOP_P,
-        profanity_check=True,
-        verify_ssl_certs=False,
-        streaming=False,
-        timeout=120  # Увеличенный timeout до 120 секунд
+        temperature=GIGACHAT_TEMPERATURE,  # 0.2 для стабильных результатов
+        top_p=GIGACHAT_TOP_P,  # 1.0 для полного разнообразия токенов
+        profanity_check=True,  # Проверка на нецензурную лексику
+        verify_ssl_certs=False,  # Отключаем проверку SSL для dev-контейнеров
+        streaming=False,  # Получаем полный ответ целиком
+        timeout=120  # Увеличенный timeout до 120 секунд для стабильности
     )
+    # Создание LangChain цепочки (LLM + Prompt)
+    # return_final_only=False нужен для доступа к полной информации о токенах
     chain = LLMChain(llm=llm, prompt=prompt, return_final_only=False)
 
     print("\n=== Диалог с ассистентом по каталогу товаров ===")
     print("(Для выхода введите 'exit', 'выход' или нажмите Enter 2 раза подряд)\n")
     
-    empty_input_count = 0
+    empty_input_count = 0  # Счётчик пустых вводов для двойного Enter
     while True:
         user_input = input("User: ")
         
-        # Обработка пустого ввода
+        # Обработка пустого ввода - выход после двойного Enter
         if not user_input.strip():
             empty_input_count += 1
             if empty_input_count >= 2:
@@ -191,17 +241,19 @@ def main():
         
         empty_input_count = 0  # Сбрасываем счётчик при любом вводе
         
+        # Обработка команд выхода
         if user_input.strip().lower() in ['exit', 'выход', 'quit', 'q']:
             print("\n👋 Выход из диалога. До свидания!")
             break
         
         # Обработка запросов на вывод списка товаров
+        # Распознаём фразы типа "покажи 10 товаров", "список", "дай первые 5"
         if any(word in user_input.lower() for word in ['список', 'покажи', 'дай', 'выведи', 'первые', 'все']):
-            # Извлекаем число, если есть
+            # Извлекаем число из запроса, если указано
             import re
             numbers = re.findall(r'\d+', user_input)
             count = int(numbers[0]) if numbers else 5
-            count = min(count, 20)  # Ограничиваем до 20 товаров
+            count = min(count, 20)  # Ограничиваем до 20 товаров для читаемости
             
             print(f"\n📋 Вывожу первые {count} товаров:")
             name_col = 'name' if 'name' in products_df.columns else products_df.columns[0]
@@ -210,32 +262,36 @@ def main():
             print("\nДля генерации карточки введите название конкретного товара или ключевое слово (например: 'ноутбук', 'наушники')")
             continue
         
-        # Поиск товара по запросу пользователя
+        # Поиск товара по запросу пользователя с использованием умного поиска
         product_info = get_product_info(user_input, products_df)
         if not product_info:
             print("Ассистент: Товар не найден в каталоге. Попробуйте другой запрос.")
             continue
+        
+        # Преобразуем словарь product_info в строку для передачи в промпт
         product_data_str = "\n".join([f"{k}: {v}" for k, v in product_info.items()])
         
-        # Повторные попытки при ошибках соединения
+        # ========== RETRY МЕХАНИЗМ ==========
+        # При ошибках подключения к API делаем 3 попытки с прогрессивными задержками
         max_retries = 3
         retry_count = 0
         response = None
         
         while retry_count < max_retries:
             try:
-                # Используем invoke для вызова chain
+                # Вызываем цепочку LangChain для генерации карточки товара
+                # return_only_outputs=False нужен для доступа к метаинформации (токены)
                 response = chain.invoke(
                     {"user_input": user_input, "product_data": product_data_str},
                     return_only_outputs=False
                 )
-                break  # Успешный запрос - выходим из цикла
+                break  # Успешный запрос - выходим из цикла retry
                 
             except Exception as e:
                 retry_count += 1
                 error_msg = str(e)
                 
-                # Проверяем различные типы ошибок соединения и таймаута
+                # Проверяем, является ли это ошибкой соединения/таймаута
                 is_connection_error = any(keyword in error_msg.lower() for keyword in [
                     "connection reset", "connecttimeout", "timeout", 
                     "timed out", "handshake", "ssl"
@@ -243,7 +299,8 @@ def main():
                 
                 if is_connection_error:
                     if retry_count < max_retries:
-                        wait_time = retry_count * 3  # Увеличиваем паузу с каждой попыткой: 3, 6, 9 сек
+                        # Прогрессивная задержка: 3, 6, 9 секунд
+                        wait_time = retry_count * 3
                         print(f"\n⚠️  Ошибка соединения (попытка {retry_count}/{max_retries}). Повторяю через {wait_time} сек...")
                         import time
                         time.sleep(wait_time)
@@ -252,26 +309,24 @@ def main():
                         print("   Проверьте подключение к интернету и попробуйте снова.")
                         break
                 else:
-                    # Другие ошибки - не повторяем
+                    # Другие ошибки (не связанные с сетью) - не повторяем
                     print(f"\n❌ Ошибка при генерации ответа: {e}")
                     break
         
         if response is None:
             continue
             
-        # Обработка успешного ответа
+        # ========== ВЫВОД РЕЗУЛЬТАТА ==========
         print("\n• Входной запрос:")
         print(user_input)
         print("\n• Ответ ассистента:")
         
-        # Извлекаем текст ответа
+        # Извлекаем текст ответа из response (может быть в 'text' или 'output')
         response_text = response.get('text', response.get('output', ''))
         print(response_text)
         
-        # Попытка получить информацию о токенах из разных мест
-        token_info_found = False
-        
-        # Детальная отладка структуры ответа (временно)
+        # ========== ДЕТАЛЬНАЯ ОТЛАДКА СТРУКТУРЫ (опционально) ==========
+        # Включается через переменную окружения DEBUG_TOKENS=true
         if os.getenv('DEBUG_TOKENS', 'false').lower() == 'true':
             print("\n[DEBUG] Структура ответа:")
             print(f"Ключи верхнего уровня: {list(response.keys())}")
@@ -291,10 +346,13 @@ def main():
                         if hasattr(msg, 'usage_metadata'):
                             print(f"usage_metadata: {msg.usage_metadata}")
         
-        # Попытка получить информацию о токенах из разных мест
+        # ========== ИЗВЛЕЧЕНИЕ ТОКЕНОВ ==========
+        # Пытаемся получить информацию о токенах из нескольких возможных мест
         token_info_found = False
         
-        # Вариант 1: Из full_generation.message.usage_metadata (приоритетный для GigaChat)
+        # ПРИОРИТЕТ 1: full_generation[0].message.usage_metadata (основной для GigaChat)
+        # Здесь GigaChat возвращает информацию о токенах в формате:
+        # {'input_tokens': X, 'output_tokens': Y, 'total_tokens': Z, 'input_token_details': {'cache_read': N}}
         if 'full_generation' in response:
             full_gen = response['full_generation']
             if isinstance(full_gen, list) and len(full_gen) > 0:
@@ -304,17 +362,20 @@ def main():
                         if usage:
                             print("\n• 💰 Расход токенов:")
                             if isinstance(usage, dict):
+                                # Извлекаем токены из словаря
                                 input_tokens = usage.get('input_tokens', usage.get('prompt_tokens', 'N/A'))
                                 output_tokens = usage.get('output_tokens', usage.get('completion_tokens', 'N/A'))
                                 total_tokens = usage.get('total_tokens', 'N/A')
                                 print(f"  Входных токенов (prompt): {input_tokens}")
                                 print(f"  Выходных токенов (completion): {output_tokens}")
                                 print(f"  Всего токенов: {total_tokens}")
+                                # Дополнительно показываем кэшированные токены, если есть
                                 if 'input_token_details' in usage and 'cache_read' in usage['input_token_details']:
                                     cache_read = usage['input_token_details']['cache_read']
                                     if cache_read > 0:
                                         print(f"  Кэшированных токенов: {cache_read}")
                             else:
+                                # Если usage - объект, получаем атрибуты
                                 input_tokens = getattr(usage, 'input_tokens', None) or getattr(usage, 'prompt_tokens', None)
                                 output_tokens = getattr(usage, 'output_tokens', None) or getattr(usage, 'completion_tokens', None)
                                 total_tokens = getattr(usage, 'total_tokens', None)
@@ -324,9 +385,10 @@ def main():
                             token_info_found = True
                             break
         
-        # Вариант 2: из generation_info (если не нашли выше)
+        # ПРИОРИТЕТ 2: generation_info (fallback для старых версий LangChain)
         if not token_info_found and 'generation_info' in response:
             gen_info = response['generation_info']
+            # generation_info может быть списком - берём первый элемент
             if gen_info and isinstance(gen_info, list) and len(gen_info) > 0:
                 gen_info = gen_info[0]
             if gen_info and isinstance(gen_info, dict) and 'usage' in gen_info:
@@ -337,18 +399,18 @@ def main():
                 print(f"  Всего токенов: {usage.get('total_tokens', 'N/A')}")
                 token_info_found = True
             
-            # Вариант 3: из llm_output (если есть)
-            if not token_info_found and 'llm_output' in response:
-                llm_out = response['llm_output']
-                if llm_out and 'token_usage' in llm_out:
-                    usage = llm_out['token_usage']
-                    print("\n• 💰 Расход токенов:")
-                    print(f"  Входных токенов (prompt): {usage.get('prompt_tokens', 'N/A')}")
-                    print(f"  Выходных токенов (completion): {usage.get('completion_tokens', 'N/A')}")
-                    print(f"  Всего токенов: {usage.get('total_tokens', 'N/A')}")
-                    token_info_found = True
+        # ПРИОРИТЕТ 3: llm_output (ещё один fallback)
+        if not token_info_found and 'llm_output' in response:
+            llm_out = response['llm_output']
+            if llm_out and 'token_usage' in llm_out:
+                usage = llm_out['token_usage']
+                print("\n• 💰 Расход токенов:")
+                print(f"  Входных токенов (prompt): {usage.get('prompt_tokens', 'N/A')}")
+                print(f"  Выходных токенов (completion): {usage.get('completion_tokens', 'N/A')}")
+                print(f"  Всего токенов: {usage.get('total_tokens', 'N/A')}")
+                token_info_found = True
         
-        # Если токены не найдены
+        # Если токены не найдены нигде - уведомляем пользователя
         if not token_info_found:
             print("\n• 💰 Расход токенов: информация недоступна")
 
