@@ -60,16 +60,32 @@ def get_product_info(query, df):
     """
     Улучшенный поиск товара: сначала точное совпадение, затем поиск по ключевым словам
     """
+    import re
+    
     # Проверяем, есть ли колонка 'name' (может называться по-другому)
     name_col = None
+    possible_names = ['name', 'title', 'product', 'description', 'название', 'наименование']
+    
     for col in df.columns:
-        if 'name' in col.lower() or 'название' in col.lower() or 'наименование' in col.lower():
-            name_col = col
+        col_lower = str(col).lower()
+        for possible in possible_names:
+            if possible in col_lower:
+                name_col = col
+                break
+        if name_col:
             break
     
     if not name_col:
-        # Если колонка не найдена, берём первую колонку
+        # Если колонка не найдена, берём первую текстовую колонку
+        for col in df.columns:
+            if df[col].dtype == 'object' and col.lower() != 'id':
+                name_col = col
+                break
+    
+    if not name_col:
         name_col = df.columns[0]
+    
+    print(f"🔍 Поиск в колонке: '{name_col}'")
     
     # Попытка точного совпадения
     row = df[df[name_col].astype(str).str.lower() == query.lower()]
@@ -80,10 +96,16 @@ def get_product_info(query, df):
     keywords = query.lower().split()
     for keyword in keywords:
         if len(keyword) > 2:  # Игнорируем короткие слова
-            matches = df[df[name_col].astype(str).str.lower().str.contains(keyword, na=False)]
-            if not matches.empty:
-                print(f"Найдено {len(matches)} товаров по запросу '{keyword}'. Беру первый.")
-                return matches.iloc[0].to_dict()
+            # Экранируем специальные символы regex
+            escaped_keyword = re.escape(keyword)
+            try:
+                matches = df[df[name_col].astype(str).str.lower().str.contains(escaped_keyword, na=False, regex=True)]
+                if not matches.empty:
+                    print(f"✓ Найдено {len(matches)} товаров по запросу '{keyword}'. Беру первый.")
+                    return matches.iloc[0].to_dict()
+            except Exception as e:
+                print(f"⚠️ Ошибка поиска по слову '{keyword}': {e}")
+                continue
     
     return None
 
@@ -92,6 +114,19 @@ def main():
     products_df = load_products()
     print("\nПервые 5 товаров из каталога:")
     print(products_df.head())
+    print("\n=== Колонки в каталоге ===")
+    print(products_df.columns.tolist())
+    
+    # Определяем колонку с названием товара
+    name_columns = [col for col in products_df.columns if any(word in str(col).lower() for word in ['name', 'title', 'product', 'description', 'название'])]
+    if name_columns:
+        print(f"\n=== Найдены колонки с названиями: {name_columns} ===")
+        print(f"Примеры данных из '{name_columns[0]}':")
+        print(products_df[name_columns[0]].head())
+    else:
+        print("\n⚠️ Колонка с названием не найдена. Используется первая колонка.")
+        print(f"Первая колонка: {products_df.columns[0]}")
+        print(products_df[products_df.columns[0]].head())
 
     # Загрузка системного промпта
     with open(os.path.join(os.path.dirname(__file__), '..', 'prompts', 'system_prompt.txt'), encoding='utf-8') as f:
@@ -114,12 +149,29 @@ def main():
     )
     chain = LLMChain(llm=llm, prompt=prompt)
 
-    print("\n=== Диалог с ассистентом по каталогу товаров ===\n(Для выхода введите 'exit')\n")
+    print("\n=== Диалог с ассистентом по каталогу товаров ===")
+    print("(Для выхода введите 'exit' или 'выход')\n")
     while True:
         user_input = input("User: ")
-        if user_input.strip().lower() == 'exit':
-            print("Выход из диалога.")
+        if user_input.strip().lower() in ['exit', 'выход', 'quit', 'q']:
+            print("\n👋 Выход из диалога. До свидания!")
             break
+        
+        # Обработка запросов на вывод списка товаров
+        if any(word in user_input.lower() for word in ['список', 'покажи', 'дай', 'выведи', 'первые', 'все']):
+            # Извлекаем число, если есть
+            import re
+            numbers = re.findall(r'\d+', user_input)
+            count = int(numbers[0]) if numbers else 5
+            count = min(count, 20)  # Ограничиваем до 20 товаров
+            
+            print(f"\n📋 Вывожу первые {count} товаров:")
+            name_col = 'name' if 'name' in products_df.columns else products_df.columns[0]
+            for idx, row in products_df.head(count).iterrows():
+                print(f"{idx+1}. {row[name_col]}")
+            print("\nДля генерации карточки введите название конкретного товара или ключевое слово (например: 'ноутбук', 'наушники')")
+            continue
+        
         # Поиск товара по запросу пользователя
         product_info = get_product_info(user_input, products_df)
         if not product_info:
