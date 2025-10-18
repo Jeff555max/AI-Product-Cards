@@ -258,12 +258,51 @@ def main():
                     print(f"  Всего токенов: {usage.get('total_tokens', 'N/A')}")
                     token_info_found = True
             
-            # Если токены не найдены, выводим отладочную информацию
+            # Вариант 3: из full_generation (для GigaChat)
+            if not token_info_found and 'full_generation' in response:
+                full_gen = response['full_generation']
+                if isinstance(full_gen, list) and len(full_gen) > 0:
+                    gen = full_gen[0]
+                    if hasattr(gen, 'generation_info') and gen.generation_info:
+                        if 'usage' in gen.generation_info:
+                            usage = gen.generation_info['usage']
+                            print("\n• 💰 Расход токенов:")
+                            print(f"  Входных токенов (prompt): {usage.get('prompt_tokens', 'N/A')}")
+                            print(f"  Выходных токенов (completion): {usage.get('completion_tokens', 'N/A')}")
+                            print(f"  Всего токенов: {usage.get('total_tokens', 'N/A')}")
+                            token_info_found = True
+            
+            # Если токены не найдены, пробуем отладку
             if not token_info_found:
-                print("\n• 💰 Расход токенов: информация недоступна")
-                # Отладка: выводим структуру ответа
-                if isinstance(response, dict):
-                    print(f"  (Доступные ключи в ответе: {list(response.keys())})")
+                # Попробуем извлечь из full_generation детально
+                if 'full_generation' in response:
+                    full_gen = response['full_generation']
+                    if isinstance(full_gen, list) and len(full_gen) > 0:
+                        gen = full_gen[0]
+                        # Выводим доступные атрибуты для отладки
+                        print("\n• 💰 Расход токенов:")
+                        if hasattr(gen, 'generation_info'):
+                            gen_info = gen.generation_info
+                            if isinstance(gen_info, dict):
+                                if 'usage' in gen_info:
+                                    usage = gen_info['usage']
+                                    print(f"  Входных токенов (prompt): {usage.get('prompt_tokens', 'N/A')}")
+                                    print(f"  Выходных токенов (completion): {usage.get('completion_tokens', 'N/A')}")
+                                    print(f"  Всего токенов: {usage.get('total_tokens', 'N/A')}")
+                                    token_info_found = True
+                                elif 'token_usage' in gen_info:
+                                    usage = gen_info['token_usage']
+                                    print(f"  Входных токенов (prompt): {usage.get('prompt_tokens', 'N/A')}")
+                                    print(f"  Выходных токенов (completion): {usage.get('completion_tokens', 'N/A')}")
+                                    print(f"  Всего токенов: {usage.get('total_tokens', 'N/A')}")
+                                    token_info_found = True
+                                else:
+                                    print(f"  Информация недоступна (ключи в generation_info: {list(gen_info.keys())})")
+                        
+                        if not token_info_found:
+                            print("  Информация недоступна")
+                else:
+                    print("\n• 💰 Расход токенов: информация недоступна")
                     
         except Exception as e:
             print(f"\n❌ Ошибка при генерации ответа: {e}")
