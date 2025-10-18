@@ -216,36 +216,65 @@ def main():
             continue
         product_data_str = "\n".join([f"{k}: {v}" for k, v in product_info.items()])
         
-        try:
-            # Используем invoke для вызова chain
-            response = chain.invoke(
-                {"user_input": user_input, "product_data": product_data_str},
-                return_only_outputs=False
-            )
+        # Повторные попытки при ошибках соединения
+        max_retries = 3
+        retry_count = 0
+        response = None
+        
+        while retry_count < max_retries:
+            try:
+                # Используем invoke для вызова chain
+                response = chain.invoke(
+                    {"user_input": user_input, "product_data": product_data_str},
+                    return_only_outputs=False
+                )
+                break  # Успешный запрос - выходим из цикла
+                
+            except Exception as e:
+                retry_count += 1
+                error_msg = str(e)
+                
+                if "Connection reset by peer" in error_msg or "ConnectTimeout" in error_msg or "timeout" in error_msg.lower():
+                    if retry_count < max_retries:
+                        print(f"\n⚠️  Ошибка соединения (попытка {retry_count}/{max_retries}). Повторяю запрос...")
+                        import time
+                        time.sleep(2)  # Пауза перед повторной попыткой
+                    else:
+                        print(f"\n❌ Ошибка при генерации ответа после {max_retries} попыток: {e}")
+                        print("   Проверьте подключение к интернету и попробуйте снова.")
+                        break
+                else:
+                    # Другие ошибки - не повторяем
+                    print(f"\n❌ Ошибка при генерации ответа: {e}")
+                    break
+        
+        if response is None:
+            continue
             
-            print("\n• Входной запрос:")
-            print(user_input)
-            print("\n• Ответ ассистента:")
-            
-            # Извлекаем текст ответа
-            response_text = response.get('text', response.get('output', ''))
-            print(response_text)
-            
-            # Попытка получить информацию о токенах из разных мест
-            token_info_found = False
-            
-            # Вариант 1: из generation_info
-            if 'generation_info' in response:
-                gen_info = response['generation_info']
-                if gen_info and isinstance(gen_info, list) and len(gen_info) > 0:
-                    gen_info = gen_info[0]
-                if gen_info and isinstance(gen_info, dict) and 'usage' in gen_info:
-                    usage = gen_info['usage']
-                    print("\n• 💰 Расход токенов:")
-                    print(f"  Входных токенов (prompt): {usage.get('prompt_tokens', 'N/A')}")
-                    print(f"  Выходных токенов (completion): {usage.get('completion_tokens', 'N/A')}")
-                    print(f"  Всего токенов: {usage.get('total_tokens', 'N/A')}")
-                    token_info_found = True
+        # Обработка успешного ответа
+        print("\n• Входной запрос:")
+        print(user_input)
+        print("\n• Ответ ассистента:")
+        
+        # Извлекаем текст ответа
+        response_text = response.get('text', response.get('output', ''))
+        print(response_text)
+        
+        # Попытка получить информацию о токенах из разных мест
+        token_info_found = False
+        
+        # Вариант 1: из generation_info
+        if 'generation_info' in response:
+            gen_info = response['generation_info']
+            if gen_info and isinstance(gen_info, list) and len(gen_info) > 0:
+                gen_info = gen_info[0]
+            if gen_info and isinstance(gen_info, dict) and 'usage' in gen_info:
+                usage = gen_info['usage']
+                print("\n• 💰 Расход токенов:")
+                print(f"  Входных токенов (prompt): {usage.get('prompt_tokens', 'N/A')}")
+                print(f"  Выходных токенов (completion): {usage.get('completion_tokens', 'N/A')}")
+                print(f"  Всего токенов: {usage.get('total_tokens', 'N/A')}")
+                token_info_found = True
             
             # Вариант 2: из llm_output (если есть)
             if not token_info_found and 'llm_output' in response:
@@ -303,10 +332,6 @@ def main():
                             print("  Информация недоступна")
                 else:
                     print("\n• 💰 Расход токенов: информация недоступна")
-                    
-        except Exception as e:
-            print(f"\n❌ Ошибка при генерации ответа: {e}")
-            continue
 
 
 if __name__ == "__main__":
