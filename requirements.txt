@@ -1,5 +1,6 @@
 pandas
 python-dotenv
+requests
 gigachain
 langchain_gigachat==0.3.12
 langchain==0.3.27
