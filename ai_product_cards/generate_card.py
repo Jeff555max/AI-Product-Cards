@@ -22,16 +22,6 @@ def get_product_info(query, df):
     return None
 
 def main():
-    # Ввод запроса пользователя
-    user_input = input("Введите запрос для генерации карточки товара: ")
-
-    # Пример: берём первый товар для теста
-    query = user_input
-    product_info = get_product_info(query, products_df)
-    if not product_info:
-        print("Товар не найден в каталоге.")
-        return
-    product_data_str = "\n".join([f"{k}: {v}" for k, v in product_info.items()])
 
     # Загрузка системного промпта
     with open(os.path.join(os.path.dirname(__file__), '..', 'prompts', 'system_prompt.txt'), encoding='utf-8') as f:
@@ -49,18 +39,28 @@ def main():
     )
     chain = LLMChain(llm=llm, prompt=prompt)
 
-    # Генерация карточки
-    response = chain.run(user_input=user_input, product_data=product_data_str)
+    print("\n=== Диалог с ассистентом по каталогу товаров ===\n(Для выхода введите 'exit')\n")
+    while True:
+        user_input = input("User: ")
+        if user_input.strip().lower() == 'exit':
+            print("Выход из диалога.")
+            break
+        # Поиск товара по запросу пользователя
+        product_info = get_product_info(user_input, products_df)
+        if not product_info:
+            print("Ассистент: Товар не найден в каталоге. Попробуйте другой запрос.")
+            continue
+        product_data_str = "\n".join([f"{k}: {v}" for k, v in product_info.items()])
+        response = chain.run(user_input=user_input, product_data=product_data_str)
+        print("\n• Входной запрос:")
+        print(user_input)
+        print("\n• Ответ ассистента:")
+        print(response)
+        # Попытка вывести расход токенов (если поддерживается)
+        if hasattr(response, 'llm_output') and 'token_usage' in response.llm_output:
+            print("\n• Расход токенов:")
+            print(response.llm_output['token_usage'])
 
-    # Вывод в консоль
-    print("\nВходной запрос:")
-    print(user_input)
-    print("\nОтвет ассистента:")
-    print(response)
-    # Попытка вывести расход токенов (если поддерживается)
-    if hasattr(response, 'llm_output') and 'token_usage' in response.llm_output:
-        print("\nРасход токенов:")
-        print(response.llm_output['token_usage'])
 
 if __name__ == "__main__":
     main()
