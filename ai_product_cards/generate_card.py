@@ -271,6 +271,19 @@ def main():
         # Попытка получить информацию о токенах из разных мест
         token_info_found = False
         
+        # Детальная отладка структуры ответа (временно)
+        if os.getenv('DEBUG_TOKENS', 'false').lower() == 'true':
+            print("\n[DEBUG] Структура ответа:")
+            print(f"Ключи верхнего уровня: {list(response.keys())}")
+            if 'full_generation' in response:
+                full_gen = response['full_generation']
+                if isinstance(full_gen, list) and len(full_gen) > 0:
+                    gen = full_gen[0]
+                    print(f"Тип full_generation[0]: {type(gen)}")
+                    print(f"Атрибуты: {dir(gen)}")
+                    if hasattr(gen, 'generation_info'):
+                        print(f"generation_info: {gen.generation_info}")
+        
         # Вариант 1: из generation_info
         if 'generation_info' in response:
             gen_info = response['generation_info']
@@ -299,15 +312,20 @@ def main():
             if not token_info_found and 'full_generation' in response:
                 full_gen = response['full_generation']
                 if isinstance(full_gen, list) and len(full_gen) > 0:
-                    gen = full_gen[0]
-                    if hasattr(gen, 'generation_info') and gen.generation_info:
-                        if 'usage' in gen.generation_info:
-                            usage = gen.generation_info['usage']
-                            print("\n• 💰 Расход токенов:")
-                            print(f"  Входных токенов (prompt): {usage.get('prompt_tokens', 'N/A')}")
-                            print(f"  Выходных токенов (completion): {usage.get('completion_tokens', 'N/A')}")
-                            print(f"  Всего токенов: {usage.get('total_tokens', 'N/A')}")
-                            token_info_found = True
+                    for gen in full_gen:
+                        # Проверяем разные возможные атрибуты
+                        if hasattr(gen, 'generation_info') and gen.generation_info:
+                            gen_info = gen.generation_info
+                            if isinstance(gen_info, dict):
+                                # Пробуем разные ключи
+                                usage = gen_info.get('usage') or gen_info.get('token_usage')
+                                if usage:
+                                    print("\n• 💰 Расход токенов:")
+                                    print(f"  Входных токенов (prompt): {usage.get('prompt_tokens', 'N/A')}")
+                                    print(f"  Выходных токенов (completion): {usage.get('completion_tokens', 'N/A')}")
+                                    print(f"  Всего токенов: {usage.get('total_tokens', 'N/A')}")
+                                    token_info_found = True
+                                    break
             
             # Если токены не найдены, пробуем отладку
             if not token_info_found:
