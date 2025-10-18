@@ -1,6 +1,5 @@
 pandas
 python-dotenv
 gigachain
-langchain_gigachat
-langchain
-openai
+langchain_gigachat==0.3.12
+langchain==0.3.27
