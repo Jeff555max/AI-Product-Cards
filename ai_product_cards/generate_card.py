@@ -167,9 +167,10 @@ def main():
         temperature=GIGACHAT_TEMPERATURE,
         top_p=GIGACHAT_TOP_P,
         profanity_check=True,
-        verify_ssl_certs=False
+        verify_ssl_certs=False,
+        streaming=False
     )
-    chain = LLMChain(llm=llm, prompt=prompt)
+    chain = LLMChain(llm=llm, prompt=prompt, return_final_only=False)
 
     print("\n=== Диалог с ассистентом по каталогу товаров ===")
     print("(Для выхода введите 'exit', 'выход' или нажмите Enter 2 раза подряд)\n")
@@ -215,18 +216,58 @@ def main():
             continue
         product_data_str = "\n".join([f"{k}: {v}" for k, v in product_info.items()])
         
-        # Используем invoke вместо прямого вызова
-        response = chain.invoke({"user_input": user_input, "product_data": product_data_str})
-        
-        print("\n• Входной запрос:")
-        print(user_input)
-        print("\n• Ответ ассистента:")
-        print(response['text'] if 'text' in response else response.get('output', response))
-        # Расход токенов (если поддерживается)
-        usage = response.get('llm_output', {}).get('token_usage') if isinstance(response, dict) else None
-        if usage:
-            print("\n• Расход токенов:")
-            print(usage)
+        try:
+            # Используем invoke для вызова chain
+            response = chain.invoke(
+                {"user_input": user_input, "product_data": product_data_str},
+                return_only_outputs=False
+            )
+            
+            print("\n• Входной запрос:")
+            print(user_input)
+            print("\n• Ответ ассистента:")
+            
+            # Извлекаем текст ответа
+            response_text = response.get('text', response.get('output', ''))
+            print(response_text)
+            
+            # Попытка получить информацию о токенах из разных мест
+            token_info_found = False
+            
+            # Вариант 1: из generation_info
+            if 'generation_info' in response:
+                gen_info = response['generation_info']
+                if gen_info and isinstance(gen_info, list) and len(gen_info) > 0:
+                    gen_info = gen_info[0]
+                if gen_info and isinstance(gen_info, dict) and 'usage' in gen_info:
+                    usage = gen_info['usage']
+                    print("\n• 💰 Расход токенов:")
+                    print(f"  Входных токенов (prompt): {usage.get('prompt_tokens', 'N/A')}")
+                    print(f"  Выходных токенов (completion): {usage.get('completion_tokens', 'N/A')}")
+                    print(f"  Всего токенов: {usage.get('total_tokens', 'N/A')}")
+                    token_info_found = True
+            
+            # Вариант 2: из llm_output (если есть)
+            if not token_info_found and 'llm_output' in response:
+                llm_out = response['llm_output']
+                if llm_out and 'token_usage' in llm_out:
+                    usage = llm_out['token_usage']
+                    print("\n• 💰 Расход токенов:")
+                    print(f"  Входных токенов (prompt): {usage.get('prompt_tokens', 'N/A')}")
+                    print(f"  Выходных токенов (completion): {usage.get('completion_tokens', 'N/A')}")
+                    print(f"  Всего токенов: {usage.get('total_tokens', 'N/A')}")
+                    token_info_found = True
+            
+            # Если токены не найдены, выводим отладочную информацию
+            if not token_info_found:
+                print("\n• 💰 Расход токенов: информация недоступна")
+                # Отладка: выводим структуру ответа
+                if isinstance(response, dict):
+                    print(f"  (Доступные ключи в ответе: {list(response.keys())})")
+                    
+        except Exception as e:
+            print(f"\n❌ Ошибка при генерации ответа: {e}")
+            continue
 
 
 if __name__ == "__main__":
