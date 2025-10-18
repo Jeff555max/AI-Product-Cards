@@ -327,9 +327,17 @@ def main():
                                 print("\n• 💰 Расход токенов:")
                                 # usage_metadata может быть словарём или объектом
                                 if isinstance(usage, dict):
-                                    print(f"  Входных токенов (prompt): {usage.get('input_tokens', usage.get('prompt_tokens', 'N/A'))}")
-                                    print(f"  Выходных токенов (completion): {usage.get('output_tokens', usage.get('completion_tokens', 'N/A'))}")
-                                    print(f"  Всего токенов: {usage.get('total_tokens', 'N/A')}")
+                                    input_tokens = usage.get('input_tokens', usage.get('prompt_tokens', 'N/A'))
+                                    output_tokens = usage.get('output_tokens', usage.get('completion_tokens', 'N/A'))
+                                    total_tokens = usage.get('total_tokens', 'N/A')
+                                    print(f"  Входных токенов (prompt): {input_tokens}")
+                                    print(f"  Выходных токенов (completion): {output_tokens}")
+                                    print(f"  Всего токенов: {total_tokens}")
+                                    # Дополнительная информация о кэше
+                                    if 'input_token_details' in usage and 'cache_read' in usage['input_token_details']:
+                                        cache_read = usage['input_token_details']['cache_read']
+                                        if cache_read > 0:
+                                            print(f"  Кэшированных токенов: {cache_read}")
                                 else:
                                     # Если это объект с атрибутами
                                     input_tokens = getattr(usage, 'input_tokens', None) or getattr(usage, 'prompt_tokens', None)
