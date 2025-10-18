@@ -280,9 +280,16 @@ def main():
                 if isinstance(full_gen, list) and len(full_gen) > 0:
                     gen = full_gen[0]
                     print(f"Тип full_generation[0]: {type(gen)}")
-                    print(f"Атрибуты: {dir(gen)}")
                     if hasattr(gen, 'generation_info'):
                         print(f"generation_info: {gen.generation_info}")
+                    if hasattr(gen, 'message'):
+                        msg = gen.message
+                        print(f"Тип message: {type(msg)}")
+                        print(f"Атрибуты message: {[attr for attr in dir(msg) if not attr.startswith('_')]}")
+                        if hasattr(msg, 'response_metadata'):
+                            print(f"response_metadata: {msg.response_metadata}")
+                        if hasattr(msg, 'usage_metadata'):
+                            print(f"usage_metadata: {msg.usage_metadata}")
         
         # Вариант 1: из generation_info
         if 'generation_info' in response:
@@ -313,8 +320,29 @@ def main():
                 full_gen = response['full_generation']
                 if isinstance(full_gen, list) and len(full_gen) > 0:
                     for gen in full_gen:
-                        # Проверяем разные возможные атрибуты
-                        if hasattr(gen, 'generation_info') and gen.generation_info:
+                        # Проверяем message.usage_metadata (новый способ для LangChain)
+                        if hasattr(gen, 'message') and hasattr(gen.message, 'usage_metadata'):
+                            usage = gen.message.usage_metadata
+                            if usage:
+                                print("\n• 💰 Расход токенов:")
+                                # usage_metadata может быть словарём или объектом
+                                if isinstance(usage, dict):
+                                    print(f"  Входных токенов (prompt): {usage.get('input_tokens', usage.get('prompt_tokens', 'N/A'))}")
+                                    print(f"  Выходных токенов (completion): {usage.get('output_tokens', usage.get('completion_tokens', 'N/A'))}")
+                                    print(f"  Всего токенов: {usage.get('total_tokens', 'N/A')}")
+                                else:
+                                    # Если это объект с атрибутами
+                                    input_tokens = getattr(usage, 'input_tokens', None) or getattr(usage, 'prompt_tokens', None)
+                                    output_tokens = getattr(usage, 'output_tokens', None) or getattr(usage, 'completion_tokens', None)
+                                    total_tokens = getattr(usage, 'total_tokens', None)
+                                    print(f"  Входных токенов (prompt): {input_tokens or 'N/A'}")
+                                    print(f"  Выходных токенов (completion): {output_tokens or 'N/A'}")
+                                    print(f"  Всего токенов: {total_tokens or 'N/A'}")
+                                token_info_found = True
+                                break
+                        
+                        # Альтернатива: проверяем generation_info
+                        if not token_info_found and hasattr(gen, 'generation_info') and gen.generation_info:
                             gen_info = gen.generation_info
                             if isinstance(gen_info, dict):
                                 # Пробуем разные ключи
