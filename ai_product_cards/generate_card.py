@@ -214,11 +214,14 @@ def main():
             print("Ассистент: Товар не найден в каталоге. Попробуйте другой запрос.")
             continue
         product_data_str = "\n".join([f"{k}: {v}" for k, v in product_info.items()])
-        response = chain(user_input=user_input, product_data=product_data_str)
+        
+        # Используем invoke вместо прямого вызова
+        response = chain.invoke({"user_input": user_input, "product_data": product_data_str})
+        
         print("\n• Входной запрос:")
         print(user_input)
         print("\n• Ответ ассистента:")
-        print(response['text'] if 'text' in response else response)
+        print(response['text'] if 'text' in response else response.get('output', response))
         # Расход токенов (если поддерживается)
         usage = response.get('llm_output', {}).get('token_usage') if isinstance(response, dict) else None
         if usage:
