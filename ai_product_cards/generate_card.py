@@ -168,7 +168,8 @@ def main():
         top_p=GIGACHAT_TOP_P,
         profanity_check=True,
         verify_ssl_certs=False,
-        streaming=False
+        streaming=False,
+        timeout=120  # Увеличенный timeout до 120 секунд
     )
     chain = LLMChain(llm=llm, prompt=prompt, return_final_only=False)
 
@@ -234,11 +235,18 @@ def main():
                 retry_count += 1
                 error_msg = str(e)
                 
-                if "Connection reset by peer" in error_msg or "ConnectTimeout" in error_msg or "timeout" in error_msg.lower():
+                # Проверяем различные типы ошибок соединения и таймаута
+                is_connection_error = any(keyword in error_msg.lower() for keyword in [
+                    "connection reset", "connecttimeout", "timeout", 
+                    "timed out", "handshake", "ssl"
+                ])
+                
+                if is_connection_error:
                     if retry_count < max_retries:
-                        print(f"\n⚠️  Ошибка соединения (попытка {retry_count}/{max_retries}). Повторяю запрос...")
+                        wait_time = retry_count * 3  # Увеличиваем паузу с каждой попыткой: 3, 6, 9 сек
+                        print(f"\n⚠️  Ошибка соединения (попытка {retry_count}/{max_retries}). Повторяю через {wait_time} сек...")
                         import time
-                        time.sleep(2)  # Пауза перед повторной попыткой
+                        time.sleep(wait_time)
                     else:
                         print(f"\n❌ Ошибка при генерации ответа после {max_retries} попыток: {e}")
                         print("   Проверьте подключение к интернету и попробуйте снова.")
