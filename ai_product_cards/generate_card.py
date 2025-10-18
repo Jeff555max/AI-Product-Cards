@@ -57,15 +57,41 @@ def load_products():
         exit(1)
 
 def get_product_info(query, df):
-    # Поиск товара по названию (можно доработать под свои нужды)
-    row = df[df['name'].str.lower() == query.lower()]
+    """
+    Улучшенный поиск товара: сначала точное совпадение, затем поиск по ключевым словам
+    """
+    # Проверяем, есть ли колонка 'name' (может называться по-другому)
+    name_col = None
+    for col in df.columns:
+        if 'name' in col.lower() or 'название' in col.lower() or 'наименование' in col.lower():
+            name_col = col
+            break
+    
+    if not name_col:
+        # Если колонка не найдена, берём первую колонку
+        name_col = df.columns[0]
+    
+    # Попытка точного совпадения
+    row = df[df[name_col].astype(str).str.lower() == query.lower()]
     if not row.empty:
         return row.iloc[0].to_dict()
+    
+    # Поиск по ключевым словам
+    keywords = query.lower().split()
+    for keyword in keywords:
+        if len(keyword) > 2:  # Игнорируем короткие слова
+            matches = df[df[name_col].astype(str).str.lower().str.contains(keyword, na=False)]
+            if not matches.empty:
+                print(f"Найдено {len(matches)} товаров по запросу '{keyword}'. Беру первый.")
+                return matches.iloc[0].to_dict()
+    
     return None
 
 def main():
     # Загрузка каталога товаров
     products_df = load_products()
+    print("\nПервые 5 товаров из каталога:")
+    print(products_df.head())
 
     # Загрузка системного промпта
     with open(os.path.join(os.path.dirname(__file__), '..', 'prompts', 'system_prompt.txt'), encoding='utf-8') as f:
