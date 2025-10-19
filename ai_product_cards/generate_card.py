@@ -272,15 +272,22 @@ def main():
                 'планшет': ['tablet', 'ipad']
             }
             
-            # Ищем категорию в запросе
+            # Ищем категорию в запросе (учитываем склонения)
             category_found = None
             search_keywords = []
-            words = user_input.lower().split()
+            input_lower = user_input.lower()
             
-            for word in words:
-                if word in synonyms:
-                    category_found = word
-                    search_keywords.extend(synonyms[word])
+            # Проверяем наличие ключевых слов с учётом склонений
+            for key, values in synonyms.items():
+                # Проверяем вхождение базового слова (ноутбук -> ноутбуков, ноутбука, ноутбуки)
+                # Используем startswith для корректной проверки основы слова
+                words_in_input = input_lower.split()
+                for word in words_in_input:
+                    if word.startswith(key) or word.startswith(key[:-1]):  # ноутбук/ноутбуков
+                        category_found = key
+                        search_keywords.extend(values)
+                        break
+                if category_found:
                     break
             
             # Если категория найдена - фильтруем товары
