@@ -209,5 +209,5 @@ marimo/_static/
 marimo/_lsp/
 __marimo__/
 
-# Data files
-data/
+# Data files - ignore only CSV file, not the directory
+data/*.csv
