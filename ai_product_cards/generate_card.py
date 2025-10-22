@@ -1,14 +1,33 @@
 
 import os
+import sys
 import pandas as pd
 from dotenv import load_dotenv
 from langchain.prompts import PromptTemplate
 from langchain.chains import LLMChain
 from langchain_gigachat.chat_models import GigaChat
 import requests
+from langfuse.langchain import CallbackHandler
+
+# Устанавливаем UTF-8 кодировку для Python
+if sys.platform.startswith('win'):
+    import locale
+    locale.setlocale(locale.LC_ALL, 'ru_RU.UTF-8')
+else:
+    os.environ['LANG'] = 'en_US.UTF-8'
+    os.environ['LC_ALL'] = 'en_US.UTF-8'
 
 # Загрузка переменных окружения из .env файла
 load_dotenv()
+
+# Инициализация Langfuse handler для трейсинга
+try:
+    langfuse_handler = CallbackHandler()
+    langfuse_enabled = True
+except Exception as e:
+    print(f"⚠️  Langfuse не удалось инициализировать: {e}")
+    langfuse_handler = None
+    langfuse_enabled = False
 
 # Получение настроек GigaChat из переменных окружения
 GIGACHAT_API_KEY = os.getenv("GIGACHAT_API_KEY")
@@ -225,7 +244,11 @@ def main():
     chain = LLMChain(llm=llm, prompt=prompt, return_final_only=False)
 
     print("\n=== Диалог с ассистентом по каталогу товаров ===")
-    print("(Для выхода введите 'exit', 'выход' или нажмите Enter 2 раза подряд)\n")
+    print("(Для выхода введите 'exit', 'выход' или нажмите Enter 2 раза подряд)")
+    if langfuse_enabled:
+        print("🔍 Langfuse трейсинг активирован: https://cloud.langfuse.com\n")
+    else:
+        print("⚠️  Langfuse трейсинг отключен\n")
     
     empty_input_count = 0  # Счётчик пустых вводов для двойного Enter
     while True:
@@ -335,10 +358,18 @@ def main():
             try:
                 # Вызываем цепочку LangChain для генерации карточки товара
                 # return_only_outputs=False нужен для доступа к метаинформации (токены)
-                response = chain.invoke(
-                    {"user_input": user_input, "product_data": product_data_str},
-                    return_only_outputs=False
-                )
+                # Передаем langfuse_handler для автоматического трейсинга
+                if langfuse_enabled and langfuse_handler:
+                    response = chain.invoke(
+                        {"user_input": user_input, "product_data": product_data_str},
+                        config={"callbacks": [langfuse_handler]},
+                        return_only_outputs=False
+                    )
+                else:
+                    response = chain.invoke(
+                        {"user_input": user_input, "product_data": product_data_str},
+                        return_only_outputs=False
+                    )
                 break  # Успешный запрос - выходим из цикла retry
                 
             except Exception as e:
