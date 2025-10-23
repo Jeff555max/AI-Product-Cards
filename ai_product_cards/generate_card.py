@@ -39,7 +39,7 @@ except Exception as e:
 GIGACHAT_API_KEY = os.getenv("GIGACHAT_API_KEY")
 GIGACHAT_CLIENT_ID = os.getenv("GIGACHAT_CLIENT_ID")
 GIGACHAT_SCOPE = os.getenv("GIGACHAT_SCOPE")
-GIGACHAT_MODEL = os.getenv("GIGACHAT_MODEL", "GigaChat-Pro")  # По умолчанию GigaChat-Pro
+GIGACHAT_MODEL = os.getenv("GIGACHAT_MODEL", "GigaChat-Lite")  # По умолчанию GigaChat-Lite
 GIGACHAT_TEMPERATURE = float(os.getenv("GIGACHAT_TEMPERATURE", 0.2))  # Температура для контроля креативности
 GIGACHAT_TOP_P = float(os.getenv("GIGACHAT_TOP_P", 1))  # Top-p sampling для разнообразия ответов
 
