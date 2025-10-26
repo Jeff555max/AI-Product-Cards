@@ -15,11 +15,7 @@
 
 </div>
 
-<div align="center">
-
-[![DeepAnalyze-8b Demo](https://img.shields.io/badge/🎥_CLICK_TO_WATCH_DEEPANALYZE--8b_DEMO-FF6B6B?style=for-the-badge&logo=googledrive&logoColor=white)](https://drive.google.com/file/d/1SNcPFe7CzNMf3w8nbiGeLcUOXHs_SkLs/view?usp=sharing)
-
-</div>
+[![DeepAnalyze Demo](https://img.shields.io/badge/🚀_DeepAnalyze_Demo-007ACC?style=for-the-badge&logo=google-drive&logoColor=white)](https://drive.google.com/file/d/1SNcPFe7CzNMf3w8nbiGeLcUOXHs_SkLs/view?usp=sharing)
 
 ## О проекте
 Демонстрация работы проекта доступна по ссылке выше.
