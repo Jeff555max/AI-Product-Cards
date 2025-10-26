@@ -15,7 +15,18 @@
 
 </div>
 
-[![DeepAnalyze Demo](https://img.shields.io/badge/🚀_DeepAnalyze_Demo-007ACC?style=for-the-badge&logo=google-drive&logoColor=white)](https://drive.google.com/file/d/1SNcPFe7CzNMf3w8nbiGeLcUOXHs_SkLs/view?usp=sharing)
+<div align="center">
+  <a href="https://drive.google.com/file/d/1SNcPFe7CzNMf3w8nbiGeLcUOXHs_SkLs/view?usp=sharing">
+    <div style="border: 2px solid #007ACC; border-radius: 10px; padding: 20px; width: 600px; background: #f5f5f5; text-align: center;">
+      <div style="font-size: 48px;">🎥</div>
+      <h3>DeepAnalyze-8b Demo Video</h3>
+      <p>Click to watch on Google Drive</p>
+      <div style="background: #007ACC; color: white; padding: 10px; border-radius: 5px; margin-top: 10px;">
+        ▶️ Play Video
+      </div>
+    </div>
+  </a>
+</div>
 
 ## О проекте
 Демонстрация работы проекта доступна по ссылке выше.
