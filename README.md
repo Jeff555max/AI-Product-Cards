@@ -8,7 +8,12 @@
 # Пример реализации
 - [Демонстрация проекта](https://drive.google.com/file/d/1SNcPFe7CzNMf3w8nbiGeLcUOXHs_SkLs/view?usp=sharing)
 <div align="center">
-  
+
+  # Пример реализации
+
+[<img src="https://img.shields.io/badge/📹-Пример_реализации-blue?style=for-the-badge" alt="Пример реализации">](https://drive.google.com/file/d/1SNcPFe7CzNMf3w8nbiGeLcUOXHs_SkLs/view?usp=sharing)
+
+</div>
 *Нажмите на изображение для просмотра полного видео*
 
 ## О проекте
