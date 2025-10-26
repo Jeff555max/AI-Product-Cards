@@ -14,13 +14,6 @@
 [<img src="https://img.shields.io/badge/📹-Пример_реализации-blue?style=for-the-badge" alt="Пример реализации">](https://drive.google.com/file/d/1SNcPFe7CzNMf3w8nbiGeLcUOXHs_SkLs/view?usp=sharing)
 
 </div>
-
-[![DeepAnalyze Demo](https://img.shields.io/badge/🎬_Watch_Full_Demo-FF6B6B?style=for-the-badge)](https://drive.google.com/file/d/1SNcPFe7CzNMf3w8nbiGeLcUOXHs_SkLs/view?usp=sharing)
-
-<a href="https://drive.google.com/file/d/1SNcPFe7CzNMf3w8nbiGeLcUOXHs_SkLs/view?usp=sharing">
-  <img src="https://via.placeholder.com/800x450/007ACC/FFFFFF?text=DeepAnalyze-8b+Demo+Video" alt="Demo Video Thumbnail" width="600">
-</a>
-
 *Нажмите на изображение для просмотра полного видео*
 
 ## О проекте
