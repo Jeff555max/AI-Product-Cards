@@ -211,3 +211,7 @@ __marimo__/
 
 # Data files - ignore only CSV file, not the directory
 data/*.csv
+
+# Telegram Bot logs
+telegram_bot.log
+*.log
