@@ -8,6 +8,7 @@
 # Пример реализации
 - [Демонстрация проекта](https://drive.google.com/file/d/1SNcPFe7CzNMf3w8nbiGeLcUOXHs_SkLs/view?usp=sharing)
 <div align="center">
+  
 *Нажмите на изображение для просмотра полного видео*
 
 ## О проекте
