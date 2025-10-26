@@ -183,15 +183,24 @@ class BotHandlers:
         
         # Обработка кнопок клавиатуры
         if user_input == "📋 Список товаров":
-            self.cmd_list(message)
+            self.show_random_products(message, limit=10)
             return
         elif user_input == "ℹ️ Справка":
             self.cmd_help(message)
             return
+        elif user_input == "🔍 Создать ещё карточку":
+            self.bot.send_message(
+                message.chat.id,
+                "✏️ <b>Отлично!</b>\n\nОтправьте название товара или категорию:\n• наушники\n• laptop\n• Sony Speaker",
+                parse_mode='HTML'
+            )
+            return
         elif user_input == "🎧 Наушники":
-            user_input = "наушники"
+            self.show_category_products(message, "наушники", "🎧 Наушники")
+            return
         elif user_input == "💻 Ноутбуки":
-            user_input = "ноутбук"
+            self.show_category_products(message, "ноутбук", "💻 Ноутбуки")
+            return
         
         # Отправляем статус "печатает..."
         self.bot.send_chat_action(message.chat.id, 'typing')
@@ -218,6 +227,75 @@ class BotHandlers:
         
         # Генерация карточки
         self.generate_and_send_card(message, user_input, product_info)
+    
+    def show_random_products(self, message, limit: int = 10):
+        """Показать случайные товары из всего каталога"""
+        try:
+            # Получаем случайные товары
+            sample_products = self.products_df.sample(min(limit, len(self.products_df)))
+            
+            name_col = 'name' if 'name' in self.products_df.columns else self.products_df.columns[0]
+            
+            products_list = "\n".join([
+                f"{idx + 1}. {row[name_col]}"
+                for idx, (_, row) in enumerate(sample_products.iterrows())
+            ])
+            
+            response = f"""
+📋 <b>Случайные {limit} товаров из каталога:</b>
+
+{products_list}
+
+💡 Отправьте название любого товара для генерации карточки!
+            """
+            
+            self.bot.send_message(message.chat.id, response, parse_mode='HTML')
+            
+        except Exception as e:
+            self.bot.send_message(
+                message.chat.id,
+                f"❌ Ошибка при загрузке списка: {str(e)}"
+            )
+    
+    def show_category_products(self, message, category: str, category_title: str, limit: int = 10):
+        """Показать случайные товары из категории"""
+        try:
+            # Используем функцию поиска товаров по категории
+            category_products = search_products(category, self.products_df, limit=100)
+            
+            if not category_products:
+                self.bot.send_message(
+                    message.chat.id,
+                    f"❌ Товары категории '{category_title}' не найдены."
+                )
+                return
+            
+            # Берём случайные из найденных
+            import random
+            selected = random.sample(category_products, min(limit, len(category_products)))
+            
+            name_col = 'name' if 'name' in self.products_df.columns else self.products_df.columns[0]
+            
+            products_list = "\n".join([
+                f"{idx + 1}. {item.get(name_col, 'N/A')}"
+                for idx, item in enumerate(selected)
+            ])
+            
+            response = f"""
+{category_title} - <b>Случайные {len(selected)} товаров:</b>
+
+{products_list}
+
+💡 Отправьте название товара для создания карточки!
+            """
+            
+            self.bot.send_message(message.chat.id, response, parse_mode='HTML')
+            
+        except Exception as e:
+            self.bot.send_message(
+                message.chat.id,
+                f"❌ Ошибка при загрузке категории: {str(e)}"
+            )
     
     def handle_not_found(self, message, query: str):
         """Обработка случая, когда товар не найден"""
@@ -292,11 +370,47 @@ class BotHandlers:
             # Отправляем карточку (разбиваем если слишком длинная)
             self.send_long_message(message.chat.id, final_response)
             
+            # Предлагаем продолжить работу
+            self.prompt_continue(message.chat.id)
+            
         except Exception as e:
             self.bot.send_message(
                 message.chat.id,
                 f"❌ Ошибка при генерации: {str(e)}"
             )
+    
+    def prompt_continue(self, chat_id: int):
+        """
+        Предлагает пользователю продолжить работу с интерактивной клавиатурой.
+        """
+        # Создаём клавиатуру с вариантами
+        markup = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
+        markup.add(
+            types.KeyboardButton("🔍 Создать ещё карточку"),
+            types.KeyboardButton("📋 Список товаров"),
+            types.KeyboardButton("🎧 Наушники"),
+            types.KeyboardButton("💻 Ноутбуки"),
+            types.KeyboardButton("ℹ️ Справка"),
+        )
+        
+        continue_message = """
+━━━━━━━━━━━━━━━━━━━━
+✅ <b>Карточка готова!</b>
+
+<b>Что дальше?</b>
+• 🔍 Создайте карточку для другого товара
+• 📋 Посмотрите список доступных товаров
+• Или просто отправьте название товара
+
+💡 Например: "Sony Speaker", "laptop", "колонка"
+        """
+        
+        self.bot.send_message(
+            chat_id,
+            continue_message,
+            parse_mode='HTML',
+            reply_markup=markup
+        )
     
     def send_long_message(self, chat_id: int, text: str, max_length: int = 4096):
         """
